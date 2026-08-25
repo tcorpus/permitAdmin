@@ -20,7 +20,10 @@ declare module 'mssql' {
   export class ConnectionPool {
     request(): {
       input(name: string, type: unknown, value: unknown): void;
-      execute(procName: string): Promise<{ recordset?: Array<Record<string, unknown>> }>;
+      execute(procName: string): Promise<{
+        recordset?: Array<Record<string, unknown>>;
+        recordsets?: Array<Array<Record<string, unknown>>>;
+      }>;
     };
   }
 
@@ -28,4 +31,5 @@ declare module 'mssql' {
 
   export const Int: unknown;
   export const Date: unknown;
+  export function NVarChar(length?: number): unknown;
 }

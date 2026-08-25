@@ -2,7 +2,7 @@ import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { pathToFileURL } from 'node:url';
-import { getPermits } from './services/permitService.js';
+import { getPermits, submitPermit, type PermitApplication } from './services/permitService.js';
 
 dotenv.config();
 
@@ -41,6 +41,34 @@ app.get('/api/permits', async (req: Request, res: Response) => {
     console.error('Error fetching permits:', error);
     res.status(500).json({
       error: 'Failed to fetch permits',
+      details: process.env.NODE_ENV === 'development' ? message : undefined,
+    });
+  }
+});
+
+app.post('/api/permits', async (req: Request, res: Response) => {
+  const body = req.body as Partial<PermitApplication>;
+  const requiredFields = ['permitType', 'permitPeriod', 'streetNumber', 'streetName', 'firstName', 'lastName', 'phoneNumber', 'email', 'requestedDate'];
+  const missingField = requiredFields.find((field) => body[field as keyof PermitApplication] === undefined || body[field as keyof PermitApplication] === '');
+
+  if (missingField || (body.permitType !== 'open-burn' && body.permitType !== 'campfire')) {
+    res.status(400).json({ error: 'Permit type and all applicant, address, and date fields are required' });
+    return;
+  }
+
+  if (body.permitType === 'campfire' && (body.permitStartTime === undefined || body.permitEndTime === undefined)) {
+    res.status(400).json({ error: 'Campfire permits require a start and end time' });
+    return;
+  }
+
+  try {
+    const result = await submitPermit(body as PermitApplication);
+    res.status(201).json(result);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error submitting permit:', error);
+    res.status(500).json({
+      error: 'Failed to submit permit',
       details: process.env.NODE_ENV === 'development' ? message : undefined,
     });
   }

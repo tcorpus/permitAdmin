@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildPermitQueryParams, formatDate, getPageNumbers, toggleSort } from '../src/App.tsx';
+import { buildPermitApplication, buildPermitQueryParams, formatDate, getPageNumbers, toggleSort } from '../src/App.tsx';
 
 test('formatDate handles empty, invalid, and valid dates', () => {
   assert.equal(formatDate(null), '—');
@@ -20,4 +20,49 @@ test('getPageNumbers handles empty and multi-page results', () => {
 test('toggleSort flips the current column and resets a new column to ascending', () => {
   assert.deepEqual(toggleSort('Applicant', 'asc', 'Applicant'), { field: 'Applicant', direction: 'desc' });
   assert.deepEqual(toggleSort('Applicant', 'desc', 'PermitDate'), { field: 'PermitDate', direction: 'asc' });
+});
+
+test('buildPermitApplication creates the open-burn request payload', () => {
+  assert.deepEqual(buildPermitApplication({
+    permitType: 'open-burn',
+    permitPeriod: '14',
+    streetNumber: ' 1234 ',
+    streetName: ' Main St ',
+    firstName: ' Ted ',
+    lastName: ' Corpus ',
+    phoneNumber: '123-123-1234',
+    email: 'ted@example.com',
+    requestedDate: '2026-08-25',
+    permitStartTime: '21',
+    permitEndTime: '22',
+  }), {
+    permitType: 'open-burn',
+    permitPeriod: 14,
+    streetNumber: '1234',
+    streetName: 'Main St',
+    firstName: 'Ted',
+    lastName: 'Corpus',
+    phoneNumber: '123-123-1234',
+    email: 'ted@example.com',
+    requestedDate: '2026-08-25',
+  });
+});
+
+test('buildPermitApplication includes times for campfire applications', () => {
+  const application = buildPermitApplication({
+    permitType: 'campfire',
+    permitPeriod: '14',
+    streetNumber: '1234',
+    streetName: 'Main St',
+    firstName: 'Ted',
+    lastName: 'Corpus',
+    phoneNumber: '123-123-1234',
+    email: 'ted@example.com',
+    requestedDate: '2026-08-25',
+    permitStartTime: '21',
+    permitEndTime: '22',
+  });
+
+  assert.equal(application.permitStartTime, 21);
+  assert.equal(application.permitEndTime, 22);
 });

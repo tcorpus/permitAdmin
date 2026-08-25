@@ -1,7 +1,7 @@
 # Permit Admin App
 
-The app is a React and Vite front end for browsing burn permits returned by the
-Permit Admin API.
+The app is a React and Vite front end for browsing and creating burn permits through
+the Permit Admin API.
 
 ## User interface
 
@@ -12,19 +12,27 @@ The main screen presents permits in a responsive table with:
 - Page-size choices of `20`, `50`, `100`, `200`, and `500`
 - Pagination controls and a result-count summary
 - Loading, empty, and API error states
+- A New permit modal for open-burn and campfire applications
 
 Dates are formatted for the user's locale, and missing values are displayed as an
 em dash.
 
+The New permit form collects applicant contact information, address, permit period,
+and requested date. Selecting Campfire also displays start and end time fields. A
+successful submission closes the modal and refreshes the permit table; an ineligible
+submission keeps the form open and displays the API response.
+
 ## Implementation
 
-- `src/App.tsx` owns the table state, API request lifecycle, sorting controls, and pagination.
-- `src/index.css` provides the table layout, responsive behavior, and loading/error presentation.
+- `src/App.tsx` owns the table state, API request lifecycle, sorting controls, pagination,
+  modal state, form serialization, and submission feedback.
+- `src/index.css` provides the table layout, responsive behavior, modal form, and
+  loading/error presentation.
 - `src/main.tsx` mounts the React application.
 - `vite.config.ts` configures the development server and proxies `/api` to
   `http://localhost:3001`.
 - `tests/App.test.js` tests date formatting, query serialization, page generation,
-  and sort toggling.
+  sort toggling, and new permit payload construction.
 
 The client sends `page`, `pageSize`, `sortField`, and `sortDirection` with each
 permit request. The API's pagination response determines the available page buttons

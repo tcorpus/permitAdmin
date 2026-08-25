@@ -6,6 +6,7 @@ import {
   normalizeSort,
   parseOptionalDate,
   parseOptionalInt,
+  submitPermit,
 } from '../services/permitService.js';
 
 const rows = [
@@ -58,4 +59,75 @@ test('getPermits binds filters, maps rows, and paginates results', async () => {
   assert.equal(result.pagination.page, 1);
   assert.equal(result.pagination.total, 2);
   assert.deepEqual(result.data.map((row) => row.PermitNumber), ['A-1', 'B-2']);
+});
+
+test('submitPermit binds open-burn fields and returns procedure result sets', async () => {
+  const inputs = new Map();
+  let procedureName = '';
+  const poolFactory = async () => ({
+    request() {
+      return {
+        input(name, _type, value) {
+          inputs.set(name, value);
+        },
+        async execute(name) {
+          procedureName = name;
+          return { recordsets: [[{ isEligible: 1, responseMessage: '' }], [{ permitNumber: 'BRN-1' }]] };
+        },
+      };
+    },
+  });
+
+  const result = await submitPermit({
+    permitType: 'open-burn',
+    permitPeriod: 14,
+    streetNumber: '1234',
+    streetName: 'Main St',
+    firstName: 'Ted',
+    lastName: 'Corpus',
+    phoneNumber: '123-123-1234',
+    email: 'ted@example.com',
+    requestedDate: '2026-08-25',
+  }, poolFactory);
+
+  assert.equal(procedureName, 'dbo.colsp_SubmitOpenBurnPermitApplication');
+  assert.equal(inputs.get('permitPeriod'), 14);
+  assert.equal(inputs.get('streetName'), 'Main St');
+  assert.equal(result.permit?.permitNumber, 'BRN-1');
+});
+
+test('submitPermit binds campfire time fields and selects the campfire procedure', async () => {
+  const inputs = new Map();
+  let procedureName = '';
+  const poolFactory = async () => ({
+    request() {
+      return {
+        input(name, _type, value) {
+          inputs.set(name, value);
+        },
+        async execute(name) {
+          procedureName = name;
+          return { recordsets: [[{ isEligible: 1 }], [{ permitNumber: 'BRN-2' }]] };
+        },
+      };
+    },
+  });
+
+  await submitPermit({
+    permitType: 'campfire',
+    permitPeriod: 14,
+    streetNumber: '1234',
+    streetName: 'Main St',
+    firstName: 'Ted',
+    lastName: 'Corpus',
+    phoneNumber: '123-123-1234',
+    email: 'ted@example.com',
+    requestedDate: '2026-08-25',
+    permitStartTime: 21,
+    permitEndTime: 22,
+  }, poolFactory);
+
+  assert.equal(procedureName, 'dbo.colsp_SubmitCampfirePermitApplication');
+  assert.equal(inputs.get('permitStartTime'), 21);
+  assert.equal(inputs.get('permitEndTime'), 22);
 });

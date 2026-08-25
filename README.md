@@ -1,8 +1,8 @@
 # Permit Admin
 
-Permit Admin is an npm-workspaces monorepo for viewing burn permits in a sortable,
-paginated React table. It consists of an Express API backed by SQL Server and a
-Vite-served React client.
+Permit Admin is an npm-workspaces monorepo for viewing and creating burn permits
+in a sortable, paginated React table. It consists of an Express API backed by SQL
+Server and a Vite-served React client.
 
 ## Project structure
 
@@ -83,7 +83,11 @@ npm --workspace packages/permitAdminAPP test
 
 `GET /api/permits` accepts optional `systemId`, `startDate`, and `endDate` filters,
 plus `page`, `pageSize`, `sortField`, and `sortDirection` controls. Supported page
-sizes are `20`, `50`, `100`, `200`, and `500`. The API also exposes `GET /health`.
+sizes are `20`, `50`, `100`, `200`, and `500`.
+
+`POST /api/permits` creates an open-burn or campfire application. The API also
+exposes `GET /health`.
 
 The API executes `dbo.colsp_ListPermits`, maps the result into the public permit
-shape, then applies sorting and pagination in JavaScript.
+shape, then applies sorting and pagination in JavaScript. New applications are
+checked and saved by the corresponding SQL Server stored procedure.

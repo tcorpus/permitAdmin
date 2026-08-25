@@ -54,6 +54,25 @@ export interface PermitListResponse {
   sort: PermitSort;
 }
 
+export type PermitApplication = {
+  permitType: 'open-burn' | 'campfire';
+  permitPeriod: number;
+  streetNumber: string;
+  streetName: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  email: string;
+  requestedDate: string;
+  permitStartTime?: number;
+  permitEndTime?: number;
+};
+
+export type PermitApplicationResponse = {
+  eligibility: Record<string, unknown> | null;
+  permit: Record<string, unknown> | null;
+};
+
 const fieldMap: Record<string, PermitField> = {
   PermitDate: 'PermitDate',
   PermitNumber: 'PermitNumber',
@@ -146,5 +165,38 @@ export async function getPermits(params: PermitQueryParams = {}, poolFactory: ty
       field: safeField,
       direction: normalizedDirection,
     },
+  };
+}
+
+export async function submitPermit(application: PermitApplication, poolFactory: typeof getSqlPool = getSqlPool): Promise<PermitApplicationResponse> {
+  const pool = await poolFactory();
+  const request = pool.request();
+
+  request.input('permitPeriod', sql.Int, application.permitPeriod);
+  request.input('streetNumber', sql.NVarChar(10), application.streetNumber);
+  request.input('streetName', sql.NVarChar(100), application.streetName);
+  request.input('firstName', sql.NVarChar(50), application.firstName);
+  request.input('lastName', sql.NVarChar(50), application.lastName);
+  request.input('phoneNumber', sql.NVarChar(20), application.phoneNumber);
+  request.input('email', sql.NVarChar(255), application.email);
+  request.input('requestedDate', sql.Date, application.requestedDate);
+
+  const procedure = application.permitType === 'campfire'
+    ? 'dbo.colsp_SubmitCampfirePermitApplication'
+    : 'dbo.colsp_SubmitOpenBurnPermitApplication';
+
+  if (application.permitType === 'campfire') {
+    request.input('permitStartTime', sql.Int, application.permitStartTime);
+    request.input('permitEndTime', sql.Int, application.permitEndTime);
+  }
+
+  const result = await request.execute(procedure);
+  const recordsets = result.recordsets ?? [];
+  const firstRecordset = recordsets[0] as Record<string, unknown>[] | undefined;
+  const secondRecordset = recordsets[1] as Record<string, unknown>[] | undefined;
+
+  return {
+    eligibility: firstRecordset?.[0] ?? null,
+    permit: secondRecordset?.[0] ?? null,
   };
 }
