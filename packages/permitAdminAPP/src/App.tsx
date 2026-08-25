@@ -218,6 +218,33 @@ function PaginationControls({ page, pageSize, pageNumbers, loading, hasPreviousP
   );
 }
 
+function NavigationPane() {
+  return (
+    <aside className="navigation-pane" aria-label="Main navigation">
+      <div className="brand-lockup">
+        <strong>Langford</strong>
+        <span>Burn Permit Dashboard</span>
+      </div>
+      <nav>
+        <div className="navigation-section-title"><span aria-hidden="true">▤</span> Data</div>
+        <a className="navigation-item active-navigation-item" href="#permits" aria-current="page">All Permits</a>
+        <a className="navigation-item" href="#campfire">Campfire</a>
+        <a className="navigation-item" href="#open-burn">Open Burn</a>
+
+        <div className="navigation-section-title configuration-title"><span aria-hidden="true">⚙</span> Configuration</div>
+        <a className="navigation-item" href="#blackout-dates">Blackout Dates</a>
+        <a className="navigation-item" href="#periods">Periods (Open Burn)</a>
+        <a className="navigation-item" href="#availability">Availability (Campfire)</a>
+        <a className="navigation-item" href="#system-configs">System Configs</a>
+      </nav>
+    </aside>
+  );
+}
+
+function HealthFooter() {
+  return <footer className="health-footer" aria-label="Application health status" />;
+}
+
 export function formatPermitType(row: PermitRow): string {
   const isCampfire = row.TypeID === 2 || row.PermitType?.toLowerCase().includes('camp');
   return `${isCampfire ? '🏕️ Campfire' : '🍂 Open Burn'}`;
@@ -520,15 +547,26 @@ export default function App() {
   }, [pagination.totalPages, page]);
 
   if (selectedPermit) {
-    return <PermitDetails permit={selectedPermit} permitPeriods={permitPeriods} onBack={() => setSelectedPermit(null)} onSaved={(permit) => { setSelectedPermit(permit); setRows((current) => current.map((row) => row.PermitID === permit.PermitID ? permit : row)); }} />;
+    return (
+      <div className="application-layout">
+        <NavigationPane />
+        <main className="application-content">
+          <PermitDetails permit={selectedPermit} permitPeriods={permitPeriods} onBack={() => setSelectedPermit(null)} onSaved={(permit) => { setSelectedPermit(permit); setRows((current) => current.map((row) => row.PermitID === permit.PermitID ? permit : row)); }} />
+          <HealthFooter />
+        </main>
+      </div>
+    );
   }
 
   return (
-    <div className="page-shell">
+    <div className="application-layout">
+      <NavigationPane />
+      <main className="application-content">
+      <div className="page-shell">
       <header className="toolbar">
         <div>
-          <h1>Permit Admin</h1>
-          <p>Burn permit list</p>
+          <h1>Burn Permit Admin</h1>
+          <p>Burn Permits List</p>
         </div>
         <div className="toolbar-right">
           <button type="button" className="new-permit-button" onClick={() => setIsNewPermitOpen(true)}>
@@ -693,6 +731,9 @@ export default function App() {
           </section>
         </div>
       ) : null}
+      </div>
+      <HealthFooter />
+      </main>
     </div>
   );
 }
