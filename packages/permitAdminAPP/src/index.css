@@ -333,6 +333,24 @@ tbody tr:hover {
   gap: 0.6rem;
 }
 
+.print-button {
+  border: 1px solid #b8c9c0;
+  border-radius: 8px;
+  padding: 0.55rem 0.8rem;
+  background: #fffef4;
+  color: #385047;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.print-button:hover,
+.print-button:focus-visible {
+  border-color: #1f8a63;
+  background: #e5f3ec;
+  color: #176b4d;
+  outline: none;
+}
+
 .details-title-row {
   border-bottom: 1px solid #d7ded9;
   padding-bottom: 0.6rem;
@@ -668,5 +686,75 @@ tbody tr:hover {
 
   .permit-time-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media print {
+  @page {
+    margin: 0.6in;
+  }
+
+  body {
+    background: white;
+  }
+
+  .navigation-pane,
+  .details-header,
+  .details-title-row span,
+  .details-actions,
+  .health-footer {
+    display: none !important;
+  }
+
+  .application-layout,
+  .application-content {
+    display: block;
+    min-height: 0;
+  }
+
+  .permit-details-page {
+    width: 100%;
+    max-width: none;
+    padding: 0;
+  }
+
+  .details-title-row {
+    display: block;
+    border-bottom: 2px solid #263b32;
+    padding-bottom: 0.2in;
+  }
+
+  .details-title-row h1::before {
+    content: 'Langford Burn Permit';
+    display: block;
+    margin-bottom: 0.2in;
+    color: #263b32;
+    font-size: 2rem;
+  }
+
+  .details-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.35in 0.6in;
+    padding-top: 0.35in;
+  }
+
+  .details-section h2 {
+    color: #111827;
+    font-size: 1.2rem;
+    text-decoration: underline;
+  }
+
+  .detail-field {
+    margin-bottom: 0.18in;
+  }
+
+  .detail-field strong {
+    padding: 0;
+    min-height: 0;
+    background: transparent;
+  }
+
+  .details-error {
+    display: none;
   }
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildPermitApplication, buildPermitQueryParams, formatDate, formatPermitType, getCampfireEndTime, getPageNumbers, getOpenBurnPeriods, isCancelledStatus, shouldShowTopPagination, toggleSort } from '../src/App.tsx';
+import { buildPermitApplication, buildPermitQueryParams, formatDate, formatPermitType, getCampfireEndTime, getPageNumbers, getOpenBurnPeriods, isCancelledStatus, printPermit, shouldShowTopPagination, toggleSort } from '../src/App.tsx';
 
 test('formatDate handles empty, invalid, and valid dates', () => {
   assert.equal(formatDate(null), '—');
@@ -108,6 +108,19 @@ test('formatPermitType prefixes permit types for the list', () => {
 test('isCancelledStatus recognizes cancelled list rows', () => {
   assert.equal(isCancelledStatus('Cancelled'), true);
   assert.equal(isCancelledStatus('Granted'), false);
+});
+
+test('printPermit delegates to the browser print dialog', () => {
+  const originalWindow = globalThis.window;
+  let printCalled = false;
+  globalThis.window = { print: () => { printCalled = true; } };
+
+  try {
+    printPermit();
+    assert.equal(printCalled, true);
+  } finally {
+    globalThis.window = originalWindow;
+  }
 });
 
 test('getOpenBurnPeriods excludes Campfire periods from the selector', () => {

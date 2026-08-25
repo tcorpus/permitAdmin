@@ -254,6 +254,10 @@ export function isCancelledStatus(status: string | null): boolean {
   return status?.trim().toLowerCase() === 'cancelled';
 }
 
+export function printPermit(): void {
+  window.print();
+}
+
 function permitDraftFromRow(permit: PermitRow): PermitDetailsDraft {
   const applicantParts = permit.Applicant?.split(' ') || [];
   const addressParts = permit.PermitAddress?.split(' ') || [];
@@ -359,7 +363,10 @@ function PermitDetails({ permit, permitPeriods, onBack, onSaved }: PermitDetails
               <button type="submit" form="permit-details-form" className="submit-button" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
             </>
           ) : (
-            <button type="button" className="submit-button" onClick={() => setEditing(true)}>Edit</button>
+            <>
+              <button type="button" className="print-button" onClick={printPermit}>Generate Permit PDF</button>
+              <button type="button" className="submit-button" onClick={() => setEditing(true)}>Edit</button>
+            </>
           )}
         </div>
       </header>
