@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildPermitApplication, buildPermitQueryParams, formatDate, getPageNumbers, toggleSort } from '../src/App.tsx';
+import { buildPermitApplication, buildPermitQueryParams, formatDate, formatPermitType, getCampfireEndTime, getPageNumbers, getOpenBurnPeriods, isCancelledStatus, toggleSort } from '../src/App.tsx';
 
 test('formatDate handles empty, invalid, and valid dates', () => {
   assert.equal(formatDate(null), '—');
@@ -65,4 +65,46 @@ test('buildPermitApplication includes times for campfire applications', () => {
 
   assert.equal(application.permitStartTime, 21);
   assert.equal(application.permitEndTime, 22);
+});
+
+test('buildPermitApplication always uses Campfire period 14', () => {
+  const application = buildPermitApplication({
+    permitType: 'campfire',
+    permitPeriod: '37',
+    streetNumber: '1234',
+    streetName: 'Main St',
+    firstName: 'Ted',
+    lastName: 'Corpus',
+    phoneNumber: '',
+    email: '',
+    requestedDate: '2026-08-25',
+    permitStartTime: '18',
+    permitEndTime: '21',
+  });
+
+  assert.equal(application.permitPeriod, 14);
+});
+
+test('getCampfireEndTime allows every valid start hour and derives a three-hour end', () => {
+  assert.equal(getCampfireEndTime('0'), '3');
+  assert.equal(getCampfireEndTime('21'), '24');
+  assert.equal(getCampfireEndTime('-1'), '');
+  assert.equal(getCampfireEndTime('22'), '');
+});
+
+test('formatPermitType prefixes permit types for the list', () => {
+  assert.equal(formatPermitType({ TypeID: 2, PermitID: 1, PermitDate: null, PermitNumber: null, Applicant: null, PermitAddress: null, PermitType: 'Campfire', PermitStatus: null }), '🏕️ Campfire');
+  assert.equal(formatPermitType({ TypeID: 1, PermitID: 2, PermitDate: null, PermitNumber: null, Applicant: null, PermitAddress: null, PermitType: 'Open Burn', PermitStatus: null }), '🍂 Open Burn');
+});
+
+test('isCancelledStatus recognizes cancelled list rows', () => {
+  assert.equal(isCancelledStatus('Cancelled'), true);
+  assert.equal(isCancelledStatus('Granted'), false);
+});
+
+test('getOpenBurnPeriods excludes Campfire periods from the selector', () => {
+  assert.deepEqual(getOpenBurnPeriods([
+    { PeriodID: 14, Name: 'Campfire Period', StartDate: null, EndDate: null, TypeID: 2 },
+    { PeriodID: 37, Name: 'fall 2024', StartDate: null, EndDate: null, TypeID: 1 },
+  ]).map((period) => period.PeriodID), [37]);
 });

@@ -10,6 +10,8 @@ to the Permit Admin app.
 - Provides `GET /health` for a lightweight status check.
 - Provides `GET /api/permits` for filtered, sorted, paginated permits.
 - Provides `POST /api/permits` for new open-burn and campfire applications.
+- Provides `PUT /api/permits/:id` for updating editable permit details.
+- Provides `GET /api/permit-periods` for the current Open Burn permit period options.
 - Calls the existing `dbo.colsp_ListPermits` stored procedure through `mssql`.
 - Calls `dbo.colsp_SubmitOpenBurnPermitApplication` or
     `dbo.colsp_SubmitCampfirePermitApplication` when creating a permit.
@@ -30,7 +32,8 @@ Copy `.env.example` to `.env` and set the database connection values:
 | `DB_TRUST_SERVER_CERTIFICATE` | `true` | Trust the SQL Server certificate |
 
 The database must provide `dbo.colsp_ListPermits` with `systemId`, `startDate`,
-and `endDate` parameters, plus the two submission procedures described above.
+and `endDate` parameters, plus the two submission procedures and the checked-in
+`colsp_GetPermitPeriods` and `colsp_UpdatePermit` procedures.
 
 ## Implementation
 
@@ -39,6 +42,10 @@ and `endDate` parameters, plus the two submission procedures described above.
 - `services/permitService.ts` executes the stored procedure, maps nullable database fields,
     validates query values, sorts rows, calculates pagination metadata, and binds new
     permit applications to the appropriate submission procedure.
+- `sql/colsp_UpdatePermit.sql` contains the table-aligned update procedure definition
+    used by `updatePermit`.
+- `sql/colsp_GetPermitPeriods.sql` contains the procedure used to return all relevant
+    Open Burn and Campfire period definitions.
 - `tests/` covers query normalization, database defaults, service behavior, and the health route.
 
 Sorting is restricted to the known permit fields and defaults to `PermitDate` descending.
@@ -96,3 +103,14 @@ Example open-burn request:
 The response contains `eligibility` and `permit` result objects. A non-null
 `permit` indicates that the application was created or an existing matching permit
 was returned. When no permit is available, the eligibility response explains why.
+
+## Update permit endpoint
+
+`PUT /api/permits/:id` executes `dbo.colsp_UpdatePermit` with the applicant,
+contact, address, date, status, permit type, and period values. The endpoint returns
+`204` when the update succeeds.
+
+Open Burn period options are loaded through `dbo.colsp_GetPermitPeriods` and filtered
+to `TypeID = 1` by the client. Campfire permits use period `14` and do not require a
+period selection; their start time must be an integer from `0` through `21`, with the
+end time exactly three hours later.

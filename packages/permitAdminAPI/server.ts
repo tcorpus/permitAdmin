@@ -2,7 +2,7 @@ import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { pathToFileURL } from 'node:url';
-import { getPermits, submitPermit, type PermitApplication } from './services/permitService.js';
+import { getPermitPeriods, getPermits, submitPermit, updatePermit, type PermitApplication, type PermitUpdate } from './services/permitService.js';
 
 dotenv.config();
 
@@ -46,6 +46,16 @@ app.get('/api/permits', async (req: Request, res: Response) => {
   }
 });
 
+app.get('/api/permit-periods', async (req: Request, res: Response) => {
+  try {
+    const systemId = Number(req.query.systemId || 1);
+    res.json(await getPermitPeriods(Number.isInteger(systemId) ? systemId : 1));
+  } catch (error: unknown) {
+    console.error('Error fetching permit periods:', error);
+    res.status(500).json({ error: 'Failed to fetch permit periods' });
+  }
+});
+
 app.post('/api/permits', async (req: Request, res: Response) => {
   const body = req.body as Partial<PermitApplication>;
   const requiredFields = ['permitType', 'permitPeriod', 'streetNumber', 'streetName', 'firstName', 'lastName', 'phoneNumber', 'email', 'requestedDate'];
@@ -61,6 +71,15 @@ app.post('/api/permits', async (req: Request, res: Response) => {
     return;
   }
 
+  if (body.permitType === 'campfire') {
+    const startTime = body.permitStartTime;
+    const endTime = body.permitEndTime;
+    if (typeof startTime !== 'number' || !Number.isInteger(startTime) || startTime < 0 || startTime > 21 || endTime !== startTime + 3) {
+      res.status(400).json({ error: 'Campfire start time must be between 0 and 21, with the end time three hours later' });
+      return;
+    }
+  }
+
   try {
     const result = await submitPermit(body as PermitApplication);
     res.status(201).json(result);
@@ -69,6 +88,33 @@ app.post('/api/permits', async (req: Request, res: Response) => {
     console.error('Error submitting permit:', error);
     res.status(500).json({
       error: 'Failed to submit permit',
+      details: process.env.NODE_ENV === 'development' ? message : undefined,
+    });
+  }
+});
+
+app.put('/api/permits/:id', async (req: Request, res: Response) => {
+  const permitId = Number(req.params.id);
+  const body = req.body as Partial<PermitUpdate>;
+  const requiredFields = ['firstName', 'lastName', 'phoneNumber', 'email', 'streetNumber', 'streetName', 'permitDate', 'permitStatus', 'permitType', 'permitPeriod'];
+  const missingField = requiredFields.find((field) => {
+    const value = body[field as keyof PermitUpdate];
+    return value === undefined || value === null || value === '';
+  });
+
+  if (!Number.isInteger(permitId) || permitId < 1 || missingField) {
+    res.status(400).json({ error: 'Permit id and all editable permit fields are required' });
+    return;
+  }
+
+  try {
+    await updatePermit({ permitId, ...body } as PermitUpdate);
+    res.status(204).send();
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error updating permit:', error);
+    res.status(500).json({
+      error: 'Failed to update permit',
       details: process.env.NODE_ENV === 'development' ? message : undefined,
     });
   }

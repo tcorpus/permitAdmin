@@ -24,6 +24,7 @@ declare module 'mssql' {
         recordset?: Array<Record<string, unknown>>;
         recordsets?: Array<Array<Record<string, unknown>>>;
       }>;
+      query(queryText: string): Promise<{ recordset?: Array<Record<string, unknown>> }>;
     };
   }
 
@@ -31,5 +32,6 @@ declare module 'mssql' {
 
   export const Int: unknown;
   export const Date: unknown;
+  export const DateTime: unknown;
   export function NVarChar(length?: number): unknown;
 }

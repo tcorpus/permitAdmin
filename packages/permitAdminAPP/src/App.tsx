@@ -5,12 +5,35 @@ type SortDirection = 'asc' | 'desc';
 
 type PermitRow = {
   PermitID: number | null;
+  PeriodID?: number | null;
+  TypeID?: number | null;
   PermitDate: string | null;
+  PermitStartTime?: number | null;
+  PermitEndTime?: number | null;
+  FirstName?: string | null;
+  LastName?: string | null;
+  PhoneNumber?: string | null;
+  Email?: string | null;
   PermitNumber: string | null;
   Applicant: string | null;
   PermitAddress: string | null;
   PermitType: string | null;
   PermitStatus: string | null;
+};
+
+type PermitDetailsDraft = {
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  email: string;
+  streetNumber: string;
+  streetName: string;
+  permitDate: string;
+  permitStatus: string;
+  permitType: string;
+  permitPeriod: string;
+  permitStartTime: string;
+  permitEndTime: string;
 };
 
 type Pagination = {
@@ -31,7 +54,19 @@ type PermitApiResponse = {
   };
 };
 
+type PermitPeriod = {
+  PeriodID: number;
+  Name: string | null;
+  StartDate: string | null;
+  EndDate: string | null;
+  TypeID: number | null;
+};
+
 type PermitType = 'open-burn' | 'campfire';
+
+export function getOpenBurnPeriods(periods: PermitPeriod[]): PermitPeriod[] {
+  return periods.filter((period) => period.TypeID === 1);
+}
 
 type PermitForm = {
   permitType: PermitType;
@@ -47,10 +82,17 @@ type PermitForm = {
   permitEndTime: string;
 };
 
+const CAMPFIRE_START_TIMES = Array.from({ length: 22 }, (_value, hour) => hour);
+
+export function getCampfireEndTime(startTime: string): string {
+  const startHour = Number(startTime);
+  return Number.isInteger(startHour) && startHour >= 0 && startHour <= 21 ? String(startHour + 3) : '';
+}
+
 export function buildPermitApplication(form: PermitForm): Record<string, string | number> {
   const application: Record<string, string | number> = {
     permitType: form.permitType,
-    permitPeriod: Number(form.permitPeriod),
+    permitPeriod: form.permitType === 'campfire' ? 14 : Number(form.permitPeriod),
     streetNumber: form.streetNumber.trim(),
     streetName: form.streetName.trim(),
     firstName: form.firstName.trim(),
@@ -83,8 +125,8 @@ function emptyPermitForm(): PermitForm {
     phoneNumber: '',
     email: '',
     requestedDate: today(),
-    permitStartTime: '12',
-    permitEndTime: '15',
+    permitStartTime: '0',
+    permitEndTime: '3',
   };
 }
 
@@ -129,6 +171,195 @@ export function toggleSort(currentField: PermitField, currentDirection: SortDire
   return { field: nextField, direction: 'asc' };
 }
 
+export function formatPermitType(row: PermitRow): string {
+  const isCampfire = row.TypeID === 2 || row.PermitType?.toLowerCase().includes('camp');
+  return `${isCampfire ? '🏕️ Campfire' : '🍂 Open Burn'}`;
+}
+
+export function isCancelledStatus(status: string | null): boolean {
+  return status?.trim().toLowerCase() === 'cancelled';
+}
+
+function permitDraftFromRow(permit: PermitRow): PermitDetailsDraft {
+  const applicantParts = permit.Applicant?.split(' ') || [];
+  const addressParts = permit.PermitAddress?.split(' ') || [];
+  const status = permit.PermitStatus?.toLowerCase() === 'granted' ? '1' : permit.PermitStatus || '0';
+  const type = permit.TypeID ? String(permit.TypeID) : permit.PermitType?.toLowerCase().includes('camp') ? '2' : '1';
+
+  return {
+    firstName: permit.FirstName || applicantParts[0] || '',
+    lastName: permit.LastName || applicantParts.slice(1).join(' '),
+    phoneNumber: permit.PhoneNumber || '',
+    email: permit.Email || '',
+    streetNumber: addressParts[0] || '',
+    streetName: permit.PermitAddress?.replace(`${addressParts[0]} `, '') || '',
+    permitDate: permit.PermitDate || '',
+    permitStatus: status,
+    permitType: type,
+    permitPeriod: String(permit.PeriodID || (type === '2' ? 14 : '')),
+    permitStartTime: permit.PermitStartTime === null || permit.PermitStartTime === undefined ? '' : String(permit.PermitStartTime),
+    permitEndTime: permit.PermitStartTime === null || permit.PermitStartTime === undefined ? '' : getCampfireEndTime(String(permit.PermitStartTime)),
+  };
+}
+
+type PermitDetailsProps = {
+  permit: PermitRow;
+  permitPeriods: PermitPeriod[];
+  onBack: () => void;
+  onSaved: (permit: PermitRow) => void;
+};
+
+function PermitDetails({ permit, permitPeriods, onBack, onSaved }: PermitDetailsProps) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<PermitDetailsDraft>(() => permitDraftFromRow(permit));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const permitPeriodName = permitPeriods.find((period) => period.PeriodID === Number(draft.permitPeriod))?.Name
+    || (draft.permitPeriod ? `Period ${draft.permitPeriod}` : '—');
+  const openBurnPeriods = getOpenBurnPeriods(permitPeriods);
+
+  const updateDraft = (field: keyof PermitDetailsDraft, value: string): void => {
+    setDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const save = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    if (permit.PermitID === null) return;
+    setSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/permits/${permit.PermitID}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          permitId: permit.PermitID,
+          ...draft,
+          permitStatus: Number(draft.permitStatus),
+          permitType: Number(draft.permitType),
+          permitPeriod: draft.permitType === '2' ? 14 : Number(draft.permitPeriod),
+          permitStartTime: draft.permitStartTime === '' ? null : Number(draft.permitStartTime),
+          permitEndTime: draft.permitEndTime === '' ? null : Number(draft.permitEndTime),
+        }),
+      });
+      if (!response.ok) {
+        const payload = (await response.json()) as { error?: string };
+        throw new Error(payload.error || 'Unable to save permit');
+      }
+
+      onSaved({
+        ...permit,
+        Applicant: `${draft.firstName} ${draft.lastName}`.trim(),
+        PermitAddress: `${draft.streetNumber} ${draft.streetName}`.trim(),
+        PermitDate: draft.permitDate,
+        PermitStatus: draft.permitStatus === '1' ? 'Granted' : 'Cancelled',
+        PermitType: draft.permitType === '2' ? 'Campfire' : 'Open Burn',
+        TypeID: Number(draft.permitType),
+        PeriodID: draft.permitType === '2' ? 14 : Number(draft.permitPeriod),
+        PermitStartTime: draft.permitStartTime === '' ? null : Number(draft.permitStartTime),
+        PermitEndTime: draft.permitEndTime === '' ? null : Number(draft.permitEndTime),
+        FirstName: draft.firstName,
+        LastName: draft.lastName,
+        PhoneNumber: draft.phoneNumber,
+        Email: draft.email,
+      });
+      setEditing(false);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Unable to save permit');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const displayValue = (value: string | null): string => value || '—';
+
+  return (
+    <div className="permit-details-page">
+      <header className="details-header">
+        <button type="button" className="back-button" onClick={onBack}>← Back to permits</button>
+        <div className="details-actions">
+          {editing ? (
+            <>
+              <button type="button" className="secondary-button" onClick={() => { setDraft(permitDraftFromRow(permit)); setError(null); setEditing(false); }} disabled={saving}>Cancel</button>
+              <button type="submit" form="permit-details-form" className="submit-button" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+            </>
+          ) : (
+            <button type="button" className="submit-button" onClick={() => setEditing(true)}>Edit</button>
+          )}
+        </div>
+      </header>
+
+      <div className="details-title-row">
+        <h1>{displayValue(permit.PermitNumber)}</h1>
+        <span>ID#{displayValue(permit.PermitID === null ? null : String(permit.PermitID))}</span>
+      </div>
+
+      <form id="permit-details-form" onSubmit={save}>
+        <div className="details-grid">
+          <section className="details-section">
+            <h2>Contact Details</h2>
+            <DetailField label="First name" value={editing ? draft.firstName : permitDraftFromRow(permit).firstName} editing={editing} onChange={(value) => updateDraft('firstName', value)} />
+            <DetailField label="Last name" value={editing ? draft.lastName : permitDraftFromRow(permit).lastName} editing={editing} onChange={(value) => updateDraft('lastName', value)} />
+            <DetailField label="Email" value={editing ? draft.email : permit.Email || ''} editing={editing} required={false} onChange={(value) => updateDraft('email', value)} />
+            <DetailField label="Phone number" value={editing ? draft.phoneNumber : permit.PhoneNumber || ''} editing={editing} required={false} onChange={(value) => updateDraft('phoneNumber', value)} />
+          </section>
+          <section className="details-section">
+            <h2>Address Information</h2>
+            <DetailField label="Street number" value={editing ? draft.streetNumber : permitDraftFromRow(permit).streetNumber} editing={editing} onChange={(value) => updateDraft('streetNumber', value)} />
+            <DetailField label="Street name" value={editing ? draft.streetName : permitDraftFromRow(permit).streetName} editing={editing} onChange={(value) => updateDraft('streetName', value)} />
+          </section>
+          <section className="details-section permit-details-section">
+            <h2>Permit Details</h2>
+            <div className="permit-details-columns">
+              <div>
+                {editing ? (
+                  <label className="detail-field"><span>Permit type</span><select value={draft.permitType} onChange={(event) => updateDraft('permitType', event.target.value)} required><option value="2">Campfire</option><option value="1">Open Burn</option></select></label>
+                ) : <DetailField label="Permit type" value={permit.PermitType} editing={false} onChange={() => undefined} />}
+                {editing ? (
+                  <label className="detail-field"><span>Status</span><select value={draft.permitStatus} onChange={(event) => updateDraft('permitStatus', event.target.value)}><option value="1">Granted</option><option value="0">Cancelled</option></select></label>
+                ) : <DetailField label="Status" value={permit.PermitStatus} editing={false} onChange={() => undefined} />}
+              </div>
+              <div>
+                <DetailField label="Permit date" value={editing ? draft.permitDate : permit.PermitDate} editing={editing} type="date" onChange={(value) => updateDraft('permitDate', value)} />
+                {draft.permitType === '1' ? (
+                  editing ? (
+                    <label className="detail-field"><span>Permit period</span><select value={draft.permitPeriod} onChange={(event) => updateDraft('permitPeriod', event.target.value)} required>
+                      {openBurnPeriods.map((period) => <option key={period.PeriodID} value={period.PeriodID}>{period.Name || `Period ${period.PeriodID}`}</option>)}
+                    </select></label>
+                  ) : <DetailField label="Permit period" value={permitPeriodName} editing={false} onChange={() => undefined} />
+                ) : draft.permitType === '2' ? (
+                  <div className="permit-time-row">
+                    {editing ? (
+                      <label className="detail-field">
+                        <span>Start time</span>
+                        <select value={draft.permitStartTime} onChange={(event) => { const value = event.target.value; setDraft((current) => ({ ...current, permitStartTime: value, permitEndTime: getCampfireEndTime(value) })); }} required>
+                          {CAMPFIRE_START_TIMES.map((hour) => <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>)}
+                        </select>
+                      </label>
+                    ) : <DetailField label="Start time" value={draft.permitStartTime ? `${draft.permitStartTime}:00` : null} editing={false} onChange={() => undefined} />}
+                    <DetailField label="End time" value={draft.permitEndTime ? `${draft.permitEndTime}:00` : null} editing={false} onChange={() => undefined} />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </section>
+        </div>
+      </form>
+      {error ? <div className="error-panel details-error">{error}</div> : null}
+    </div>
+  );
+}
+
+function DetailField({ label, value, editing, type = 'text', required = true, onChange }: { label: string; value: string | null; editing: boolean; type?: string; required?: boolean; onChange: (value: string) => void }) {
+  return (
+    <label className="detail-field">
+      <span>{label}</span>
+      {editing ? <input type={type} value={value || ''} onChange={(event) => onChange(event.target.value)} required={required} /> : <strong>{value || '—'}</strong>}
+    </label>
+  );
+}
+
 export default function App() {
   const [rows, setRows] = useState<PermitRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -141,6 +372,8 @@ export default function App() {
   const [permitForm, setPermitForm] = useState<PermitForm>(emptyPermitForm);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [selectedPermit, setSelectedPermit] = useState<PermitRow | null>(null);
+    const [permitPeriods, setPermitPeriods] = useState<PermitPeriod[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
     pageSize: 20,
@@ -176,6 +409,20 @@ export default function App() {
   useEffect(() => {
     void fetchPermits();
   }, [page, pageSize, sortField, sortDirection]);
+
+  useEffect(() => {
+    void fetch('/api/permit-periods')
+      .then(async (response) => response.ok ? response.json() as Promise<PermitPeriod[]> : [])
+      .then((periods) => {
+        setPermitPeriods(periods);
+        if (periods.length > 0) {
+          setPermitForm((current) => current.permitType === 'open-burn' && !periods.some((period) => String(period.PeriodID) === current.permitPeriod)
+            ? { ...current, permitPeriod: String(periods[0].PeriodID) }
+            : current);
+        }
+      })
+      .catch(() => setPermitPeriods([]));
+  }, []);
 
   const handleSort = (field: PermitField): void => {
     const nextSort = toggleSort(sortField, sortDirection, field);
@@ -224,6 +471,10 @@ export default function App() {
   const pageNumbers = useMemo<number[]>(() => {
     return getPageNumbers(pagination.totalPages);
   }, [pagination.totalPages]);
+
+  if (selectedPermit) {
+    return <PermitDetails permit={selectedPermit} permitPeriods={permitPeriods} onBack={() => setSelectedPermit(null)} onSaved={(permit) => { setSelectedPermit(permit); setRows((current) => current.map((row) => row.PermitID === permit.PermitID ? permit : row)); }} />;
+  }
 
   return (
     <div className="page-shell">
@@ -281,13 +532,13 @@ export default function App() {
               </tr>
             ) : (
               rows.map((row) => (
-                <tr key={`${row.PermitNumber}-${row.PermitDate}`}>
+                <tr key={`${row.PermitNumber}-${row.PermitDate}`} className="permit-row" onClick={() => setSelectedPermit(row)}>
                   <td>{formatDate(row.PermitDate)}</td>
                   <td>{row.PermitNumber || '—'}</td>
                   <td>{row.Applicant || '—'}</td>
                   <td>{row.PermitAddress || '—'}</td>
-                  <td>{row.PermitType || '—'}</td>
-                  <td>{row.PermitStatus || '—'}</td>
+                  <td>{row.PermitType ? formatPermitType(row) : '—'}</td>
+                  <td className={isCancelledStatus(row.PermitStatus) ? 'cancelled-status' : ''}>{row.PermitStatus || '—'}</td>
                 </tr>
               ))
             )}
@@ -349,10 +600,32 @@ export default function App() {
                     <option value="campfire">Campfire</option>
                   </select>
                 </label>
+                {permitForm.permitType === 'open-burn' ? (
+                  <label>
+                    Permit period
+                    <select value={permitForm.permitPeriod} onChange={(event) => updateForm('permitPeriod', event.target.value)} required>
+                      {getOpenBurnPeriods(permitPeriods).map((period) => <option key={period.PeriodID} value={period.PeriodID}>{period.Name || `Period ${period.PeriodID}`}</option>)}
+                    </select>
+                  </label>
+                ) : <div className="form-grid-placeholder" aria-hidden="true" />}
                 <label>
-                  Permit period
-                  <input type="number" min="1" value={permitForm.permitPeriod} onChange={(event) => updateForm('permitPeriod', event.target.value)} required />
+                  Permit date
+                  <input type="date" value={permitForm.requestedDate} onChange={(event) => updateForm('requestedDate', event.target.value)} required />
                 </label>
+                {permitForm.permitType === 'campfire' ? (
+                  <div className="modal-time-fields">
+                    <label>
+                      Start time
+                      <select value={permitForm.permitStartTime} onChange={(event) => { const value = event.target.value; setPermitForm((current) => ({ ...current, permitStartTime: value, permitEndTime: getCampfireEndTime(value) })); }} required>
+                        {CAMPFIRE_START_TIMES.map((hour) => <option key={hour} value={hour}>{String(hour).padStart(2, '0')}:00</option>)}
+                      </select>
+                    </label>
+                    <label>
+                      End time
+                      <input type="text" value={`${permitForm.permitEndTime}:00`} readOnly aria-readonly="true" />
+                    </label>
+                  </div>
+                ) : <div className="form-grid-placeholder" aria-hidden="true" />}
                 <label>
                   First name
                   <input value={permitForm.firstName} onChange={(event) => updateForm('firstName', event.target.value)} required />
@@ -377,22 +650,6 @@ export default function App() {
                   Street name
                   <input value={permitForm.streetName} onChange={(event) => updateForm('streetName', event.target.value)} required />
                 </label>
-                <label>
-                  Permit date
-                  <input type="date" value={permitForm.requestedDate} onChange={(event) => updateForm('requestedDate', event.target.value)} required />
-                </label>
-                {permitForm.permitType === 'campfire' ? (
-                  <>
-                    <label>
-                      Start time code
-                      <input type="number" min="0" value={permitForm.permitStartTime} onChange={(event) => updateForm('permitStartTime', event.target.value)} required />
-                    </label>
-                    <label>
-                      End time code
-                      <input type="number" min="0" value={permitForm.permitEndTime} onChange={(event) => updateForm('permitEndTime', event.target.value)} required />
-                    </label>
-                  </>
-                ) : null}
               </div>
 
               {submitError ? <div className="error-panel modal-error">{submitError}</div> : null}

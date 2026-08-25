@@ -17,7 +17,7 @@ See the package READMEs for implementation details:
 ## Prerequisites
 
 - Node.js 18 or later
-- A SQL Server instance containing the `dbo.colsp_ListPermits` stored procedure and its related tables
+- A SQL Server instance containing the permit tables and these stored procedures: `dbo.colsp_ListPermits`, `dbo.colsp_SubmitOpenBurnPermitApplication`, `dbo.colsp_SubmitCampfirePermitApplication`, `dbo.colsp_GetPermitPeriods`, and `dbo.colsp_UpdatePermit`.
 
 ## Setup
 
@@ -85,8 +85,9 @@ npm --workspace packages/permitAdminAPP test
 plus `page`, `pageSize`, `sortField`, and `sortDirection` controls. Supported page
 sizes are `20`, `50`, `100`, `200`, and `500`.
 
-`POST /api/permits` creates an open-burn or campfire application. The API also
-exposes `GET /health`.
+`POST /api/permits` creates an open-burn or campfire application, and
+`PUT /api/permits/:id` updates an existing permit. `GET /api/permit-periods` returns
+the period options used by Open Burn forms. The API also exposes `GET /health`.
 
 The API executes `dbo.colsp_ListPermits`, maps the result into the public permit
 shape, then applies sorting and pagination in JavaScript. New applications are
