@@ -70,6 +70,20 @@ test('getPermits binds filters, maps rows, and paginates results', async () => {
   assert.deepEqual(result.data.map((row) => row.PermitNumber), ['A-1', 'B-2']);
 });
 
+test('getPermits accepts the configured page sizes', async () => {
+  const poolFactory = async () => ({
+    request() {
+      return {
+        input() { return this; },
+        async execute() { return { recordset: rows }; },
+      };
+    },
+  });
+
+  assert.equal((await getPermits({ pageSize: 10 }, poolFactory)).pagination.pageSize, 10);
+  assert.equal((await getPermits({ pageSize: 25 }, poolFactory)).pagination.pageSize, 25);
+});
+
 test('getPermitPeriods calls the all-periods procedure and maps period details', async () => {
   let procedureName = '';
   const inputs = new Map();

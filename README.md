@@ -83,7 +83,7 @@ npm --workspace packages/permitAdminAPP test
 
 `GET /api/permits` accepts optional `systemId`, `startDate`, and `endDate` filters,
 plus `page`, `pageSize`, `sortField`, and `sortDirection` controls. Supported page
-sizes are `20`, `50`, `100`, `200`, and `500`.
+sizes are `10`, `25`, `100`, `200`, and `500`.
 
 `POST /api/permits` creates an open-burn or campfire application, and
 `PUT /api/permits/:id` updates an existing permit. `GET /api/permit-periods` returns

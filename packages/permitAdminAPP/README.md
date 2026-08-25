@@ -9,7 +9,7 @@ The main screen presents permits in a responsive table with:
 
 - Permit date, number, applicant, address, type, and status columns
 - Column sorting with ascending and descending directions
-- Page-size choices of `20`, `50`, `100`, `200`, and `500`
+- Page-size choices of `10`, `25`, `100`, `200`, and `500`
 - Pagination controls and a result-count summary
 - Loading, empty, and API error states
 - A New permit modal for open-burn and campfire applications

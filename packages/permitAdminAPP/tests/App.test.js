@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { buildPermitApplication, buildPermitQueryParams, formatDate, formatPermitType, getCampfireEndTime, getPageNumbers, getOpenBurnPeriods, isCancelledStatus, toggleSort } from '../src/App.tsx';
+import { buildPermitApplication, buildPermitQueryParams, formatDate, formatPermitType, getCampfireEndTime, getPageNumbers, getOpenBurnPeriods, isCancelledStatus, shouldShowTopPagination, toggleSort } from '../src/App.tsx';
 
 test('formatDate handles empty, invalid, and valid dates', () => {
   assert.equal(formatDate(null), '—');
@@ -15,6 +15,14 @@ test('buildPermitQueryParams serializes the current table state', () => {
 test('getPageNumbers handles empty and multi-page results', () => {
   assert.deepEqual(getPageNumbers(0), []);
   assert.deepEqual(getPageNumbers(3), [1, 2, 3]);
+  assert.deepEqual(getPageNumbers(179, 1), [1, 2, 3, 4, 5, 'ellipsis', 179]);
+  assert.deepEqual(getPageNumbers(179, 90), [1, 'ellipsis', 89, 90, 91, 'ellipsis', 179]);
+  assert.deepEqual(getPageNumbers(179, 179), [1, 'ellipsis', 175, 176, 177, 178, 179]);
+});
+
+test('top pagination is hidden for requests of 10 rows or fewer', () => {
+  assert.equal(shouldShowTopPagination(10), false);
+  assert.equal(shouldShowTopPagination(25), true);
 });
 
 test('toggleSort flips the current column and resets a new column to ascending', () => {

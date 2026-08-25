@@ -1,6 +1,6 @@
 import { getSqlPool, sql } from '../config/db.js';
 
-const ALLOWED_PAGE_SIZES = [20, 50, 100, 200, 500] as const;
+const ALLOWED_PAGE_SIZES = [10, 25, 100, 200, 500] as const;
 const DEFAULT_SORT_FIELD = 'PermitDate';
 const DEFAULT_SORT_DIRECTION = 'desc';
 

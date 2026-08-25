@@ -49,7 +49,8 @@ and `endDate` parameters, plus the two submission procedures and the checked-in
 - `tests/` covers query normalization, database defaults, service behavior, and the health route.
 
 Sorting is restricted to the known permit fields and defaults to `PermitDate` descending.
-Invalid page sizes fall back to `20`; requested pages are clamped to the available range.
+Supported page sizes are `10`, `25`, `100`, `200`, and `500`; invalid page sizes fall
+back to `10`. Requested pages are clamped to the available range.
 
 ## Commands
 

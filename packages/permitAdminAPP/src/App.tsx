@@ -130,7 +130,7 @@ function emptyPermitForm(): PermitForm {
   };
 }
 
-const PAGE_SIZES = [20, 50, 100, 200, 500] as const;
+const PAGE_SIZES = [10, 25, 100, 200, 500] as const;
 const columns: Array<{ key: PermitField; label: string }> = [
   { key: 'PermitDate', label: 'Permit Date' },
   { key: 'PermitNumber', label: 'Permit Number' },
@@ -156,12 +156,20 @@ export function buildPermitQueryParams(page: number, pageSize: number, sortField
   });
 }
 
-export function getPageNumbers(totalPages: number): number[] {
-  const numbers: number[] = [];
-  for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
-    numbers.push(pageNumber);
-  }
-  return numbers;
+export type PageIndicator = number | 'ellipsis';
+
+export function getPageNumbers(totalPages: number, currentPage = 1): PageIndicator[] {
+  if (totalPages <= 0) return [];
+  if (totalPages <= 7) return Array.from({ length: totalPages }, (_value, index) => index + 1);
+
+  const page = Math.min(Math.max(currentPage, 1), totalPages);
+  if (page <= 4) return [1, 2, 3, 4, 5, 'ellipsis', totalPages];
+  if (page >= totalPages - 3) return [1, 'ellipsis', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  return [1, 'ellipsis', page - 1, page, page + 1, 'ellipsis', totalPages];
+}
+
+export function shouldShowTopPagination(pageSize: number): boolean {
+  return pageSize > 10;
 }
 
 export function toggleSort(currentField: PermitField, currentDirection: SortDirection, nextField: PermitField): { field: PermitField; direction: SortDirection } {
@@ -169,6 +177,45 @@ export function toggleSort(currentField: PermitField, currentDirection: SortDire
     return { field: currentField, direction: currentDirection === 'asc' ? 'desc' : 'asc' };
   }
   return { field: nextField, direction: 'asc' };
+}
+
+type PaginationControlsProps = {
+  page: number;
+  pageSize: number;
+  pageNumbers: PageIndicator[];
+  loading: boolean;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+  onPageSizeChange: (pageSize: number) => void;
+  onPageChange: (page: number) => void;
+  onPrevious: () => void;
+  onNext: () => void;
+};
+
+function PaginationControls({ page, pageSize, pageNumbers, loading, hasPreviousPage, hasNextPage, onPageSizeChange, onPageChange, onPrevious, onNext }: PaginationControlsProps) {
+  return (
+    <div className="pagination-row">
+      <label className="page-size-control">
+        Rows per page
+        <select value={pageSize} onChange={(event) => onPageSizeChange(Number(event.target.value))}>
+          {PAGE_SIZES.map((size) => <option key={size} value={size}>{size}</option>)}
+        </select>
+      </label>
+      <div className="pager">
+        <button type="button" disabled={!hasPreviousPage || loading} onClick={onPrevious}>Previous</button>
+        <div className="page-indicator">
+          {pageNumbers.map((pageNumber, index) => (
+            pageNumber === 'ellipsis' ? (
+              <span key={`ellipsis-${index}`} className="page-ellipsis" aria-hidden="true">...</span>
+            ) : (
+              <button key={pageNumber} type="button" className={pageNumber === page ? 'active-page' : ''} aria-current={pageNumber === page ? 'page' : undefined} onClick={() => onPageChange(pageNumber)} disabled={loading}>{pageNumber}</button>
+            )
+          ))}
+        </div>
+        <button type="button" disabled={!hasNextPage || loading} onClick={onNext}>Next</button>
+      </div>
+    </div>
+  );
 }
 
 export function formatPermitType(row: PermitRow): string {
@@ -365,7 +412,7 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(20);
+  const [pageSize, setPageSize] = useState<number>(10);
   const [sortField, setSortField] = useState<PermitField>('PermitDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [isNewPermitOpen, setIsNewPermitOpen] = useState<boolean>(false);
@@ -376,7 +423,7 @@ export default function App() {
     const [permitPeriods, setPermitPeriods] = useState<PermitPeriod[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
-    pageSize: 20,
+    pageSize: 10,
     total: 0,
     totalPages: 1,
     hasNextPage: false,
@@ -468,9 +515,9 @@ export default function App() {
     }
   };
 
-  const pageNumbers = useMemo<number[]>(() => {
-    return getPageNumbers(pagination.totalPages);
-  }, [pagination.totalPages]);
+  const pageNumbers = useMemo<PageIndicator[]>(() => {
+    return getPageNumbers(pagination.totalPages, page);
+  }, [pagination.totalPages, page]);
 
   if (selectedPermit) {
     return <PermitDetails permit={selectedPermit} permitPeriods={permitPeriods} onBack={() => setSelectedPermit(null)} onSaved={(permit) => { setSelectedPermit(permit); setRows((current) => current.map((row) => row.PermitID === permit.PermitID ? permit : row)); }} />;
@@ -487,21 +534,25 @@ export default function App() {
           <button type="button" className="new-permit-button" onClick={() => setIsNewPermitOpen(true)}>
             <span aria-hidden="true">+</span> New permit
           </button>
-          <label>
-            Rows per page
-            <select value={pageSize} onChange={(event) => {
-              setPage(1);
-              setPageSize(Number(event.target.value));
-            }}>
-              {PAGE_SIZES.map((size) => (
-                <option key={size} value={size}>{size}</option>
-              ))}
-            </select>
-          </label>
         </div>
       </header>
 
       {error ? <div className="error-panel">{error}</div> : null}
+
+      {shouldShowTopPagination(pageSize) ? (
+        <PaginationControls
+          page={page}
+          pageSize={pageSize}
+          pageNumbers={pageNumbers}
+          loading={loading}
+          hasPreviousPage={pagination.hasPreviousPage}
+          hasNextPage={pagination.hasNextPage}
+          onPageSizeChange={(size) => { setPage(1); setPageSize(size); }}
+          onPageChange={setPage}
+          onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+          onNext={() => setPage((current) => current + 1)}
+        />
+      ) : null}
 
       <div className="table-wrap">
         <table>
@@ -546,37 +597,18 @@ export default function App() {
         </table>
       </div>
 
-      <footer className="pager">
-        <button
-          type="button"
-          disabled={!pagination.hasPreviousPage || loading}
-          onClick={() => setPage((current) => Math.max(1, current - 1))}
-        >
-          Previous
-        </button>
-{/*
-        <div className="page-indicator">
-          {pageNumbers.map((pageNumber) => (
-            <button
-              key={pageNumber}
-              type="button"
-              className={pageNumber === page ? 'active-page' : ''}
-              onClick={() => setPage(pageNumber)}
-              disabled={loading}
-            >
-              {pageNumber}
-            </button>
-          ))}
-        </div>
-*/}
-        <button
-          type="button"
-          disabled={!pagination.hasNextPage || loading}
-          onClick={() => setPage((current) => current + 1)}
-        >
-          Next
-        </button>
-      </footer>
+      <PaginationControls
+        page={page}
+        pageSize={pageSize}
+        pageNumbers={pageNumbers}
+        loading={loading}
+        hasPreviousPage={pagination.hasPreviousPage}
+        hasNextPage={pagination.hasNextPage}
+        onPageSizeChange={(size) => { setPage(1); setPageSize(size); }}
+        onPageChange={setPage}
+        onPrevious={() => setPage((current) => Math.max(1, current - 1))}
+        onNext={() => setPage((current) => current + 1)}
+      />
 
       <div className="summary">Showing {rows.length} of {pagination.total} permits</div>
 
